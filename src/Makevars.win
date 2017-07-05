@@ -1,0 +1,3 @@
+PKG_CXXFLAGS=-I"../inst/include" -I"C:/fftw"
+PKG_LIBS=-L"C:/fftw" -lfftw3-3
+
