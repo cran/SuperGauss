@@ -1,3 +1,5 @@
+/// @file VectorFFT.h
+
 ///////////////////////////////////////////////
 // Fast Fourier Transformation and Inverse
 ///////////////////////////////////////////////
@@ -7,115 +9,160 @@
 
 // usual header
 #include <Rcpp.h>
-using namespace Rcpp;
 #include <fftw3.h>
 #include <iostream>
-#include <ctime>
-using namespace std;
+// using namespace Rcpp;
+// using namespace std;
 
+/// Forward FFT from real to complex.
+class VectorFFT {
+ private:
+  fftw_plan planfor;  ///< FFTW plan.
+ public:
+  int n_size;         ///< Size of input vector.
+  double* in;         ///< Real input vector.
+  fftw_complex* out;  ///< Complex output vector.
 
-// defining classes
-//------------------------------------------------------
-// 1, fast fourier transformation
-class VectorFFT{
-  fftw_plan planback;
-public:
-  int n_size;
-  double* in;
-  fftw_complex *out;
+  /// Constructor.
   VectorFFT(int);
-  void fft();
+  /// Destructor.
   ~VectorFFT();
+  /// Perform the FFT on the input data.
+  void fft();
 };
 
-//------------------------------------------------------
-// 1, fast fourier transformation
-// class VectorFFT
-
-inline VectorFFT::VectorFFT(int n){
+/// @param[in] n Size of the input vector.
+inline VectorFFT::VectorFFT(int n) {
   n_size = n;
   in = new double[n];
-  out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * n);
+  out = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * n);
   std::fill(in, in + n, 0);
-  planback = fftw_plan_dft_r2c_1d(n, in, out, FFTW_ESTIMATE);
+  planfor = fftw_plan_dft_r2c_1d(n, in, out, FFTW_ESTIMATE);
   return;
 }
 
-inline VectorFFT::~VectorFFT(){
-  delete []in;
+inline VectorFFT::~VectorFFT() {
+  delete[] in;
   fftw_free(out);
-  fftw_destroy_plan(planback);
-}
-
-inline void VectorFFT::fft(){
-  fftw_execute(planback);
-  return;
-}
-//------------------------------------------------------
-
-//------------------------------------------------------
-
-// 2, inverse fast fourier transformation
-class VectorIFFT{
-  fftw_plan planfor;
-public:
-  int n_size;
-  double* out;
-  fftw_complex *in;
-  VectorIFFT(int);
-  void Ifft();
-  ~VectorIFFT();
-};
-//------------------------------------------------------
-
-// 2, inverse fast fourier transformation
-//  class VectorIFFT
-
-inline VectorIFFT::VectorIFFT(int n){
-  n_size = n;
-  out = new double[n];
-  in = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * n);
-  memset(in, 0, sizeof(fftw_complex) * n);
-  planfor = fftw_plan_dft_c2r_1d(n, in, out, FFTW_ESTIMATE);
-}
-
-inline VectorIFFT::~VectorIFFT(){
-  delete []out;
-  fftw_free(in);
   fftw_destroy_plan(planfor);
 }
 
-inline void VectorIFFT::Ifft(){
+/// The result gets stored in the object member `out` of type `fftw_complex`,
+/// which is a 2-d array.  Elements are accessed via e.g., `out[0][1]`,
+/// `out[n-1][0]`.
+inline void VectorFFT::fft() {
   fftw_execute(planfor);
-  for(int ii = 0;ii < n_size; ++ii){
-    out[ii] = out[ii]/n_size;
+  return;
+}
+
+/// Backward FFT from complex to real.
+class VectorIFFT {
+  fftw_plan planback;  ///< FFTW plan.
+ public:
+  int n_size;        ///< Size of input vector.
+  double* out;       ///< Real output vector.
+  fftw_complex* in;  ///< Complex input vector.
+  /// Constructor.
+  VectorIFFT(int);
+  /// Perform the inverse FFT on the input data.
+  void Ifft();
+  /// Destructor.
+  ~VectorIFFT();
+};
+
+/// @param[in] n Size of the input vector.
+inline VectorIFFT::VectorIFFT(int n) {
+  n_size = n;
+  out = new double[n];
+  in = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * n);
+  memset(in, 0, sizeof(fftw_complex) * n);
+  planback = fftw_plan_dft_c2r_1d(n, in, out, FFTW_ESTIMATE);
+}
+
+inline VectorIFFT::~VectorIFFT() {
+  delete[] out;
+  fftw_free(in);
+  fftw_destroy_plan(planback);
+}
+
+/// The result gets stored in the object member `out` of type `double`, which is
+/// a 1-d array.  Elements are accessed via e.g., `out[0]`, `out[n-1]`.
+inline void VectorIFFT::Ifft() {
+  fftw_execute(planback);
+  for (int ii = 0; ii < n_size; ++ii) {
+    out[ii] = out[ii] / n_size;
   }
   return;
 }
-//------------------------------------------------------
 
-inline void vecConv(fftw_complex* y, fftw_complex* alpha, fftw_complex* beta, int n){
-	for (int ii = 0; ii < n; ++ii){
-		y[ii][0] = alpha[ii][0] * beta[ii][0] - alpha[ii][1] * beta[ii][1];
-		y[ii][1] = alpha[ii][1] * beta[ii][0] + alpha[ii][0] * beta[ii][1];
-	}
-	return;
+/// Product between `fftw_complex` vectors.
+///
+/// Result is `y = alpha * beta`.
+///
+/// @param[out] y Output complex vector, 2-d array.
+/// @param[in] alpha First input complex vector, 2-d array.
+/// @param[in] beta Second input complex vector, 2-d array.
+/// @param[in] n Size of inputs (integer).
+inline void vecConv(fftw_complex* y, fftw_complex* alpha, fftw_complex* beta,
+                    int n) {
+  for (int ii = 0; ii < n; ++ii) {
+    y[ii][0] = alpha[ii][0] * beta[ii][0] - alpha[ii][1] * beta[ii][1];
+    y[ii][1] = alpha[ii][1] * beta[ii][0] + alpha[ii][0] * beta[ii][1];
+  }
+  return;
 }
 
-inline void vecConv_Sub(fftw_complex* y, fftw_complex* alpha, fftw_complex* beta, int n){
-	for (int ii = 0; ii < n; ++ii){
-		y[ii][0] -= alpha[ii][0] * beta[ii][0] - alpha[ii][1] * beta[ii][1];
-		y[ii][1] -= alpha[ii][1] * beta[ii][0] + alpha[ii][0] * beta[ii][1];
-	}
-	return;
+/// In-place subtract product between `fftw_complex` vectors.
+///
+/// Result is `y -= alpha * beta`.
+///
+/// @param[out] y Output complex vector, 2-d array.
+/// @param[in] alpha First input complex vector, 2-d array.
+/// @param[in] beta Second input complex vector, 2-d array.
+/// @param[in] n Size of inputs (integer).
+inline void vecConv_Sub(fftw_complex* y, fftw_complex* alpha,
+                        fftw_complex* beta, int n) {
+  for (int ii = 0; ii < n; ++ii) {
+    y[ii][0] -= alpha[ii][0] * beta[ii][0] - alpha[ii][1] * beta[ii][1];
+    y[ii][1] -= alpha[ii][1] * beta[ii][0] + alpha[ii][0] * beta[ii][1];
+  }
+  return;
 }
 
-inline void vecConv_Add(fftw_complex* y, fftw_complex* alpha, fftw_complex* beta, int n){
-	for (int ii = 0; ii < n; ++ii){
-		y[ii][0] += alpha[ii][0] * beta[ii][0] - alpha[ii][1] * beta[ii][1];
-		y[ii][1] += alpha[ii][1] * beta[ii][0] + alpha[ii][0] * beta[ii][1];
-	}
-	return;
+/// In-place sum product between `fftw_complex` vectors.
+///
+/// Result is `y += alpha * beta`.
+///
+/// @param[out] y Output complex vector, 2-d array.
+/// @param[in] alpha First input complex vector, 2-d array.
+/// @param[in] beta Second input complex vector, 2-d array.
+/// @param[in] n Size of inputs (integer).
+inline void vecConv_Add(fftw_complex* y, fftw_complex* alpha,
+                        fftw_complex* beta, int n) {
+  for (int ii = 0; ii < n; ++ii) {
+    y[ii][0] += alpha[ii][0] * beta[ii][0] - alpha[ii][1] * beta[ii][1];
+    y[ii][1] += alpha[ii][1] * beta[ii][0] + alpha[ii][0] * beta[ii][1];
+  }
+  return;
 }
 
-# endif
+/// Steps for polynomial convolution: For two polynomials `a(x) = a_0 + a_1 * x
+/// + ... a_p * x^p` and  `b(x) = b_0 + b_1 * x + ... b_q * x^q`
+///
+/// 1) generate two VectorFFT classes: a_FFT = new VectorFFT(p+q), b_FFT = new
+/// VectorFFT(p+q) and one VectorIFFT class: c_IFFT = new VectorIFFT(p+q)
+///
+/// 2) fill the VectorFFT->in: std::copy(a, a+p, a_FFT->in), std::copy(b, b+q,
+/// b_FFT->in)
+///
+/// 3) FFT: a_FFT->fft(), b_FFT->fft()
+///
+/// 4) multiplication between VectorFFT->out: vecConv(c_FFT->out, a_FFT->out,
+/// b_FFT->out, p+q)
+///
+/// 5) IFFT: c_IFFT->ifft()
+///
+/// Then results `c(x) = c_0 + c_1 * x + ... + c_p+q * x^p+q = a(x) * b(x)` is
+/// in c_IFFT->out.
+
+#endif
