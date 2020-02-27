@@ -1,4 +1,4 @@
-## ----fbmsim, include = FALSE---------------------------------------------
+## ----fbmsim, include = FALSE--------------------------------------------------
 require(SuperGauss)
 
 N <- 3000 # number of observations
@@ -25,7 +25,7 @@ system.time({
   matrix(rnorm(N*npaths), npaths, N) %*% chol(toeplitz(acf))
 })
 
-## ----fbmsim--------------------------------------------------------------
+## ----fbmsim-------------------------------------------------------------------
 require(SuperGauss)
 
 N <- 3000 # number of observations
@@ -52,7 +52,7 @@ system.time({
   matrix(rnorm(N*npaths), npaths, N) %*% chol(toeplitz(acf))
 })
 
-## ---- fig.width = 10, fig.height = 5, out.width = "90%"------------------
+## ---- fig.width = 10, fig.height = 5, out.width = "90%"-----------------------
 # convert increments to position measurements
 Xt <- apply(rbind(0, dX), 2, cumsum)
 
@@ -65,7 +65,7 @@ for(ii in 1:npaths) {
   lines(tseq, Xt[,ii], col = clrs[ii], lwd = 2)
 }
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 # allocate and assign in one step
 Toep <- Toeplitz(acf = acf)
 Toep
@@ -75,7 +75,7 @@ Toep <- Toeplitz(n = N)
 Toep
 Toep$setAcf(acf = acf) # assign later
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 all(acf == Toep$getAcf()) # extract acf
 
 # matrix multiplication
@@ -94,7 +94,7 @@ ld1 <- determinant(toeplitz(acf))$mod
 ld2 <- determinant(Toep) # note: no $mod
 c(ld1, ld2)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 dX <- diff(Xt[,1]) # obtain the increments of a given path
 N <- length(dX)
 
@@ -133,7 +133,7 @@ Hse <- -hessian(func = loglik.GS, x = Hmle) # observed Fisher Information
 Hse <- sqrt(1/Hse[1])
 c(mle = Hmle, se = Hse)
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 T1 <- Toeplitz(n = N)
 T2 <- T1 # shallow copy: both of these point to the same memory location
 
@@ -152,7 +152,7 @@ loglik(H = .3)
 T1
 T2
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 # autocorrelation function
 exp.acf <- function(t, lambda, sigma) sigma^2 * exp(-abs(t/lambda))
 # gradient, returned as a 2-column matrix
