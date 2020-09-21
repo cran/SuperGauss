@@ -1,217 +1,334 @@
-#' @title Constructor and methods for Toeplitz matrix objects.
+#' Constructor and methods for Toeplitz matrix objects.
 #'
-#' @description The \code{Toeplitz} class contains efficient methods for linear algebra with symmetric positive definite (i.e., variance) Toeplitz matrices.
+#' @name Toeplitz
 #'
-#' @aliases setAcf getAcf traceT2 traceT4 show.Toeplitz %*% determinant solve %*%,ANY,Toeplitz-method %*%,Toeplitz,ANY-method determinant,Toeplitz-method dim,Toeplitz-method ncol,Toeplitz-method nrow,Toeplitz-method show,Toeplitz-method solve,Toeplitz-method
-#' @section Methods:
-#' If \code{Toep} is a \code{Toeplitz} object with first row/column given by \code{acf}, then:
-#' \describe{
-#' \item{\code{Toep$setAcf(acf)}}{Sets the autocorrelation of the matrix.}
-#' \item{\code{Toep$getAcf()}}{Gets the autocorrelation of the matrix.}
-#' \item{\code{nrow(Toep)}, \code{ncol(Toep)}, \code{dim(Toep)}}{Selected dimension(s) of the matrix.}
-#' \item{\code{Toep \%*\% X}, \code{X \%*\% Toep}}{Toeplitz-Matrix and Matrix-Toeplitz multiplication.  Also works if \code{X} is a vector.}
-#' \item{\code{solve(Toep, X)}, \code{solve(Toep)}}{Solves Toeplitz systems of equations.  When second argument is missing, returns the inverse of the Toeplitz matrix.}
-#' \item{\code{determinant(Toep)}}{Log-determinant of the Toeplitz matrix, i.e., same thing as \code{log(det(toeplitz(acf)))}.}
-#' \item{\code{Toep$traceT2(acf2)}}{If \code{T1 == toeplitz(acf)} and \code{T2 == toeplitz(acf2)}, computes the trace of \code{solve(T1, T2)}.  This is used in the computation of the gradient of Gaussian likelihoods with Toeplitz variance matrix.}
-#' \item{\code{Toep$traceT4(acf2, acf3)}}{If \code{T1 == toeplitz(acf)}, \code{T2 == toeplitz(acf2)}, and \code{T3 == toeplitz(acf3)}, computes the trace of \code{solve(T1, T2) \%*\% solve(T1, T3)}.  This is used in the computation of the Hessian of Gaussian likelihoods with Toeplitz variance matrix.}
-#' }
-#' @details It is assumed that the autocorrelation of the \code{Toeplitz} object defines a valid (i.e., positive definite) variance matrix.  The multiplication algorithms still work when this is not the case but the other algorithms do not (return values typically contain \code{NaN}s).
-#' @examples
-#' # construction
-#' acf <- exp(-(1:5))
-#' Toep <- Toeplitz(acf = acf)
-#' # alternatively, can allocate space first
-#' Toep <- Toeplitz(n = length(acf))
-#' Toep$setAcf(acf = acf)
+#' @param x An R object.
+#' @description The `Toeplitz` class contains efficient methods for linear algebra with symmetric positive definite (i.e., variance) Toeplitz matrices.
 #'
-#' dim(Toep) # == c(nrow(Toep), ncol(Toep))
-#' Toep # show method
-#' Toep$getAcf() # extract the acf
+#' @details An `N x N` Toeplitz matrix `Tz` is defined by its length-`N` "autocorrelation" vector `acf`, i.e., first row/column `Tz`.  Thus, for the function [stats::toeplitz()], we have `Tz = toeplitz(acf)`.
 #'
-#' # linear algebra
-#' X <- matrix(rnorm(10), 5, 2)
-#' Toep %*% X
-#' t(X) %*% Toep
-#' solve(Toep, X)
-#' determinant(Toep) # log-determinant
-#' @export
-.Toeplitz <- setRefClass("Toeplitz",
-                         fields = list(cpp_ptr = "externalptr",
-                                       size = "numeric"))
-.Toeplitz$lock("cpp_ptr") # locked fields
-.Toeplitz$lock("size")
-# internal constructor
-.Toeplitz$methods(initialize = function(n) {
-  cpp_ptr <<- .Toeplitz_constructor(n)
-  size <<- n
-})
+#' It is assumed that `acf` defines a valid (i.e., positive definite) variance matrix.  The matrix multiplication methods still work when this is not the case but the other methods do not (return values typically contain `NaN`s).
+#'
+#' `as.Toeplitz(x)` attempts to convert its argument to a `Toeplitz` object by calling `Toeplitz$new(acf = x)`. `is.Toeplitz(x)` checks whether its argument is a `Toeplitz` object.
+#'
+#' @example examples/Toeplitz.R
+NULL
 
-# exported constructor
-#' @rdname Toeplitz-class
-#' @param n Size of the Toeplitz matrix.
-#' @param acf Autocorrelation vector of Toeplitz matrix.
-#' @return A \code{Toeplitz} object.
+#' @rdname Toeplitz
 #' @export
-Toeplitz <- function(n, acf) {
-  if(missing(n)){
-    n <- length(acf)
-  }
-  Tz <- .Toeplitz$new(n)
-  if(!missing(acf)) {
-    Tz$setAcf(acf)
-  }
-  Tz
+is.Toeplitz <- function(x) "Toeplitz" %in% class(x)
+
+#' @rdname Toeplitz
+#' @export
+as.Toeplitz <- function(x) {
+  Toeplitz$new(acf = x)
 }
 
+#' @rdname Toeplitz
+#' @export
+Toeplitz <- R6Class(
+  classname = "Toeplitz",
 
-#--- custom methods ------------------------------------------------------------
+  private = list(
 
-# setter
-.Toeplitz$methods(setAcf = function(acf) {
-  if(length(acf) != size) {
-    stop("acf has wrong length.")
-  }
-  .Toeplitz_setAcf(cpp_ptr, acf)
-})
+    Tz_ = NULL,
+    PCG_ = NULL,
+    N_ = NA,
 
-# getter
-.Toeplitz$methods(getAcf = function() {
-  .Toeplitz_getAcf(cpp_ptr)
-})
+    # deep clone method.
+    # required to create new Xptr for Tz_ at C++ level
+    deep_clone = function(name, value) {
+      switch(name,
+             Tz_ = {
+               Tz_new <- Toeplitz_ctor(private$N_)
+               if(self$has_acf()) {
+                 Toeplitz_set_acf(Tz_new, self$get_acf())
+               }
+               Tz_new
+             },
+             PCG_ = PCG_ctor(private$N_),
+             value)
+    }
 
-# traceT2
-.Toeplitz$methods(traceT2 = function(acf2) {
-  if(!.Toeplitz_hasAcf(cpp_ptr)) {
-    stop("setAcf has not been called yet")
-  }
-  if(length(acf2) != size) {
-    stop("acf2 has wrong length.")
-  }
-  .Toeplitz_traceT2(cpp_ptr, acf2)
-})
+  ),
 
-# traceT4
-# TODO: fix this so that small1 is inside C++ code
-.Toeplitz$methods(traceT4 = function(acf2, acf3) {
-  if(!.Toeplitz_hasAcf(cpp_ptr)) {
-    stop("setAcf has not been called yet")
-  }
-  if(length(acf2) != size) {
-    stop("acf2 has wrong length.")
-  }
-  if(length(acf3) != size) {
-    stop("acf3 has wrong length.")
-  }
-  .Toeplitz_traceT4(cpp_ptr, acf2, acf3)
-})
+  public = list(
 
-## .traceT4 <- function(acf, acf2, acf3) {
-##   N <- acf$size
-##   ee <- c(1, rep(0, N-1))
-##   small1 <- abs(acf3[1]) < .0001
-##   if(small1) acf3[1] <- 1 + acf3[1]
-##   T4 <- acf$traceT4(acf2, acf3)
-##   if(small1) T4 <- T4 - acf$traceT4(acf2, ee)
-##   T4
-## }
+    #' @description Class constructor.
+    #'
+    #' @param N Size of Toeplitz matrix.
+    #' @param acf Autocorrelation vector of length `N`.
+    #'
+    #' @return A `Toeplitz` object.
+    initialize = function(N, acf) {
+      if(missing(N)) N <- length(acf)
+      private$N_ <- N
+      private$Tz_ <- Toeplitz_ctor(N)
+      private$PCG_ <- PCG_ctor(N)
+      if(!missing(acf)) self$set_acf(acf)
+    },
 
+    #' @description Print method.
+    print = function() {
+      if(self$has_acf()) {
+        obj_acf <- self$get_acf()[1:min(6, private$N_)]
+        obj_acf <- signif(obj_acf, digits = 3)
+        if(private$N_ > 6) obj_acf <- c(obj_acf, "...")
+      } else {
+        obj_acf <- "NULL"
+      }
+      cat("Toeplitz matrix of size", private$N_, "\n",
+          "acf: ", obj_acf, "\n")
+    },
+
+    #' @description Get the size of the Toeplitz matrix.
+    #'
+    #' @return Size of the Toeplitz matrix.  [`ncol()`][base::ncol()], [`nrow()`][base::nrow()], and [`dim()`][base::dim()] methods for `Toeplitz` objects also work as expected.
+    size = function() {
+      private$N_
+    },
+
+    #' @description Set the autocorrelation of the Toeplitz matrix.
+    #'
+    #' @param acf Autocorrelation vector of length `N`.
+    set_acf = function(acf) {
+      check_tz(acfs = list(acf = acf), N = private$N_)
+      Toeplitz_set_acf(private$Tz_, acf)
+    },
+
+    #' @description Get the autocorrelation of the Toeplitz matrix.
+    #'
+    #' @return The autocorrelation vector of length `N`.
+    get_acf = function() {
+      check_tz(has_acf = self$has_acf())
+      Toeplitz_get_acf(private$Tz_)
+    },
+
+    #' @description Check whether the autocorrelation of the Toeplitz matrix has been set.
+    #'
+    #' @return Logical; `TRUE` if `Toeplitz$set_acf()` has been called.
+    has_acf = function() {
+      Toeplitz_has_acf(private$Tz_)
+    },
+
+    #' @description Toeplitz matrix-matrix product.
+    #'
+    #' @param x Vector or matrix with `N` rows.
+    #' @return The matrix product `Tz %*% x`. `Tz %*% x` and `x %*% Tz` also work as expected.
+    prod = function(x) {
+      check_tz(has_acf = self$has_acf())
+      if(is.vector(x)) x <- as.matrix(x)
+      if(!(is.matrix(x) && is.numeric(x))) {
+        stop("x must be a numeric matrix.")
+      }
+      if(nrow(x) != private$N_) {
+        stop("Incompatible matrix multiplication dimensions.")
+      }
+      Toeplitz_prod(private$Tz_, x)
+    },
+
+    #' @description Solve a Toeplitz system of equations.
+    #'
+    #' @param x Optional vector or matrix with `N` rows.
+    #' @param method Solve method to use.  Choices are: `gschur` for a modified version of the Generalized Schur algorithm of Ammar & Gragg (1988), or `pcg` for the preconditioned conjugate gradient method of Chen et al (2006).  The former is faster and obtains the log-determinant as a direct biproduct.  The latter is more numerically stable for long-memory autocorrelations.
+    #' @param tol Tolerance level for the `pcg` method.
+    #' @return The solution in `z` to the system of equations `Tz %*% z = x`.  If `x` is missing, returns the inverse of `Tz`.  `solve(Tz, x)` and `solve(Tz, x, method, tol)` also work as expected.
+    solve = function(x, method = c("gschur", "pcg"), tol = 1e-10) {
+      method <- match.arg(method)
+      check_tz(has_acf = self$has_acf())
+      if(missing(x)) x <- diag(private$N_)
+      vec_x <- is.vector(x)
+      if(vec_x) x <- as.matrix(x)
+      if(!(is.matrix(x) && is.numeric(x))) {
+        stop("x must be a numeric matrix.")
+      }
+      if(nrow(x) != private$N_) {
+        stop("Incompatible matrix solve dimensions.")
+      }
+      y <- switch(method,
+                  gschur = Toeplitz_solve(private$Tz_, x),
+                  pcg = PCG_solve(private$PCG_, self$get_acf(), x, tol))
+      if(vec_x) y <- drop(y)
+      y
+    },
+
+    #' @description Calculate the log-determinant of the Toeplitz matrix.
+    #'
+    #' @return The log-determinant `log(det(Tz))`.  `determinant(Tz)` also works as expected.
+    log_det = function() {
+      check_tz(has_acf = self$has_acf())
+      Toeplitz_log_det(private$Tz_)
+    },
+
+    #' @description Computes the trace-gradient with respect to Toeplitz matrices.
+    #' @param acf2 Length-`N` autocorrelation vector of the second Toeplitz matrix.  This matrix must be symmetric but not necessarily positive definite.
+    #' @return Computes the trace of
+    #' ```
+    #' solve(Tz, toeplitz(acf2)).
+    #' ```
+    #' This is used in the computation of the gradient of `log(det(Tz(theta)))` with respect to `theta`.
+    trace_grad = function(acf2) {
+      check_tz(acfs = list(acf2 = acf2), N = private$N_,
+               has_acf = self$has_acf())
+      Toeplitz_trace_grad(private$Tz_, acf2)
+    },
+
+    #' @description Computes the trace-Hessian with respect to Toeplitz matrices.
+    #'
+    #' @param acf2 Length-`N` autocorrelation vector of the second Toeplitz matrix.  This matrix must be symmetric but not necessarily positive definite.
+    #' @param acf3 Length-`N` autocorrelation vector of the third Toeplitz matrix.  This matrix must be symmetric but not necessarily positive definite.
+    #' @return Computes the trace of
+    #' ```
+    #' solve(Tz, toeplitz(acf2)) %*% solve(Tz, toeplitz(acf3)).
+    #' ```
+    #' This is used in the computation of the Hessian of `log(det(Tz(theta)))` with respect to `theta`.
+    trace_hess = function(acf2, acf3) {
+      check_tz(acfs = list(acf2 = acf2, acf3 = acf3),
+               N = private$N_, has_acf = self$has_acf())
+      Toeplitz_trace_hess(private$Tz_, acf2, acf3)
+    }
+
+  )
+)
+setOldClass("Toeplitz")
 
 #--- generic methods -----------------------------------------------------------
 
-# show
-#' @export
-setMethod("show", "Toeplitz", function(object) {
-  if(.Toeplitz_hasAcf(object$cpp_ptr)) {
-    obj.acf <- object$getAcf()[1:min(6, object$size)]
-    obj.acf <- signif(obj.acf, digits = 3)
-    if(object$size > 6) obj.acf <- c(obj.acf, "...")
-  } else {
-    obj.acf <- "NULL"
-  }
-  cat("Toeplitz matrix of size", object$size, "\n",
-      "acf: ", obj.acf, "\n")
-})
-
 # ncol
+#' @rdname Toeplitz
+#' @aliases ncol,Toeplitz-method
+#' @usage NULL
 #' @export
-setMethod("ncol", "Toeplitz", function(x){
-  x$size
+setMethod("ncol", "Toeplitz", function(x) {
+  x$size()
 })
 
 # nrow
+#' @rdname Toeplitz
+#' @aliases nrow,Toeplitz-method
+#' @usage NULL
 #' @export
-setMethod("nrow", "Toeplitz", function(x){
-  x$size
+setMethod("nrow", "Toeplitz", function(x) {
+  x$size()
 })
 
 # dim
+#' @rdname Toeplitz
 #' @export
-setMethod("dim", "Toeplitz", function(x){
-  rep(x$size, 2)
-})
+dim.Toeplitz <- function(x) rep(x$size(), 2)
 
-# Toeplitz-Matrix multiplication
+# Matrix multiplication
+#' @rdname Toeplitz
+#' @aliases %*%
+#' @usage NULL
 #' @export
-setMethod("%*%", signature(x = "Toeplitz", y = "ANY"), function(x, y) {
-  if(!.Toeplitz_hasAcf(x$cpp_ptr)) {
-    stop("setAcf has not been called yet")
-  }
-  if(is.vector(y)) y <- as.matrix(y)
-  if(!is.matrix(y)) {
-    stop("Second argument should be a matrix or vector.")
-  }
-  if(nrow(y) != x$size) {
-    stop("Toeplitz and second argument are non-conformable.")
-  }
-  .Toeplitz_Multiply(x$cpp_ptr, y)
-})
+`%*%` <- function(x, y) UseMethod("%*%")
 
-# Matrix-Toeplitz multiplication
-setMethod("%*%", signature(x = "ANY", y = "Toeplitz"), function(x, y) {
-  if(!.Toeplitz_hasAcf(y$cpp_ptr)) {
-    stop("setAcf has not been called yet")
-  }
-  if(is.vector(x)) x <- as.matrix(x)
-  if(!is.matrix(x)) {
-    stop("First argument should be a matrix or vector.")
-  }
-  if(ncol(x) != y$size) {
-    stop("First argument and Toeplitz are non-conformable.")
-  }
-  t(.Toeplitz_Multiply(y$cpp_ptr, t(x)))
-})
+#' @export
+`%*%.default` <- function(x, y) {
+  if(is.Toeplitz(x) || is.Toeplitz(y)) return(`%*%.Toeplitz`(x, y))
+  base::`%*%`(x, y)
+}
+
+#' @export
+`%*%.Toeplitz` <- function(x, y) {
+  if(is.Toeplitz(x)) {
+    # Toeplitz %*% Matrix
+    if(is.Toeplitz(y)) {
+      # Toeplitz %*% Toeplitz
+      # This can be done more efficiently by Gohberg-Semencul decomposition,
+      # but not currently implemented.
+      y <- stats::toeplitz(y$get_acf())
+    }
+    check_tz(has_acf = x$has_acf())
+    if(is.vector(y)) y <- as.matrix(y)
+    if(!(is.matrix(y) && is.numeric(y))) {
+      stop("Second argument must be a numeric matrix.")
+    }
+    if(nrow(y) != x$size()) {
+      stop("Incompatible matrix multiplication dimensions.")
+    }
+    ans <- x$prod(y)
+  } else if(is.Toeplitz(y)) {
+    # Matrix %*% Toeplitz
+    check_tz(has_acf = y$has_acf())
+    if(is.vector(x)) x <- as.matrix(x)
+    if(!(is.matrix(x) && is.numeric(x))) {
+      stop("First argument must be a numeric matrix.")
+    }
+    if(ncol(x) != y$size()) {
+      stop("Incompatible matrix multiplication dimensions.")
+    }
+    ans <- t(y$prod(t(x)))
+  } else stop("This shouldn't happen.  Please contact package maintainer.")
+  ans
+}
 
 # determinant
+#' @rdname Toeplitz
+#' @aliases determinant determinant,Toeplitz-method
+#' @usage NULL
 #' @export
-setMethod("determinant", "Toeplitz",
-          function(x, logarithm = TRUE, ...) {
-  if(!.Toeplitz_hasAcf(x$cpp_ptr)) {
-    stop("setAcf has not been called yet")
-  }
-  ldT <- .Toeplitz_Determinant(x$cpp_ptr)
-  if(!logarithm) {
-    ldT <- exp(ldT)
-  }
+setMethod("determinant", "Toeplitz", function(x, logarithm = TRUE, ...) {
+  ldT <- x$log_det()
+  if(!logarithm) ldT <- exp(ldT)
   ldT
 })
 
 # solve
+#' @rdname Toeplitz
+#' @aliases solve solve,Toeplitz,ANY-method solve,Toeplitz-method
+#' @usage NULL
 #' @export
-setMethod("solve", "Toeplitz", function(a, b, ...) {
-  if(!.Toeplitz_hasAcf(a$cpp_ptr)) {
-    stop("setAcf has not been called yet")
+setMethod(
+  f = "solve",
+  signature = "Toeplitz",
+  definition = function(a, b, method = c("gschur", "pcg"), tol = 1e-10, ...) {
+    check_tz(has_acf = a$has_acf())
+    if(missing(b)) b <- diag(a$size())
+    vec_b <- is.vector(b)
+    if(vec_b) b <- as.matrix(b)
+    if(!is.matrix(b)) {
+      stop("b must be a matrix or vector.")
+    }
+    if(nrow(b) != a$size()) {
+      stop("Incompatible matrix solve dimensions.")
+    }
+    y <- a$solve(b, method, tol)
+    if(vec_b) y <- drop(y)
+    y
   }
-  if(missing(b)) b <- diag(a$size)
-  if(is.vector(b)) b <- as.matrix(b)
-  if(!is.matrix(b)) {
-    stop("b must be a matrix or vector.")
-  }
-  if(nrow(b) != a$size) {
-    stop("a and b are non-conformable.")
-  }
-  .Toeplitz_Solve(a$cpp_ptr, b)
-})
+)
 
-# now make methods display arguments
-.DollarNames.Toeplitz <- function(x, pattern)
-    grep(pattern, getRefClass(class(x))$methods(), value=TRUE)
+
+#--- helper functions ----------------------------------------------------------
+
+#' Check inputs to Toeplitz.
+#'
+#' @param acfs Named list of acfs.
+#' @param N Required size of each acf.
+#' @param has_acf Optional whether or not acf has been set.
+#'
+#' @details
+#' - For each element of `acfs` checks that it has length `N`.
+#' - If `has_acf` provided returns error if `has_acf == FALSE`.
+#' @noRd
+check_tz <- function(acfs, N, has_acf) {
+  if(!missing(has_acf)) {
+    # check has_acf
+    if(!has_acf) stop("Toeplitz$set_acf() has not been called yet.")
+  }
+  if(!missing(acfs)) {
+    # check acfs
+    for(varname in names(acfs)) {
+      x <- acfs[[varname]]
+      if(!(is.vector(x) && is.numeric(x))) {
+        stop(paste0(varname, " must be a numeric vector."))
+      }
+      if(length(x) != N) {
+        stop(paste0(varname, "has wrong length."))
+      }
+    }
+  }
+}
+

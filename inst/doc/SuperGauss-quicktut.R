@@ -1,7 +1,7 @@
 ## ----fbmsim, include = FALSE--------------------------------------------------
 require(SuperGauss)
 
-N <- 3000 # number of observations
+N <- 5000 # number of observations
 dT <- 1/60 # time between observations (seconds)
 H <- .3 # Hurst parameter
 
@@ -9,16 +9,16 @@ tseq <- (0:N)*dT # times at which to sample fBM
 npaths <- 5 # number of fBM paths to generate
 
 # to generate fbm, generate its increments, which are stationary
-msd <- fbm.msd(tseq = tseq[-1], H = H)
+msd <- fbm_msd(tseq = tseq[-1], H = H)
 acf <- msd2acf(msd = msd) # convert msd to acf
 
 # superfast method
 system.time({
-  dX <- rSnorm(n = npaths, acf = acf, fft = TRUE)
+  dX <- rnormtz(n = npaths, acf = acf, fft = TRUE)
 })
 # fast method (about 3x as slow)
 system.time({
-  rSnorm(n = npaths, acf = acf, fft = FALSE)
+  rnormtz(n = npaths, acf = acf, fft = FALSE)
 })
 # unstructured variance method (much slower)
 system.time({
@@ -28,7 +28,7 @@ system.time({
 ## ----fbmsim-------------------------------------------------------------------
 require(SuperGauss)
 
-N <- 3000 # number of observations
+N <- 5000 # number of observations
 dT <- 1/60 # time between observations (seconds)
 H <- .3 # Hurst parameter
 
@@ -36,16 +36,16 @@ tseq <- (0:N)*dT # times at which to sample fBM
 npaths <- 5 # number of fBM paths to generate
 
 # to generate fbm, generate its increments, which are stationary
-msd <- fbm.msd(tseq = tseq[-1], H = H)
+msd <- fbm_msd(tseq = tseq[-1], H = H)
 acf <- msd2acf(msd = msd) # convert msd to acf
 
 # superfast method
 system.time({
-  dX <- rSnorm(n = npaths, acf = acf, fft = TRUE)
+  dX <- rnormtz(n = npaths, acf = acf, fft = TRUE)
 })
 # fast method (about 3x as slow)
 system.time({
-  rSnorm(n = npaths, acf = acf, fft = FALSE)
+  rnormtz(n = npaths, acf = acf, fft = FALSE)
 })
 # unstructured variance method (much slower)
 system.time({
@@ -67,31 +67,36 @@ for(ii in 1:npaths) {
 
 ## -----------------------------------------------------------------------------
 # allocate and assign in one step
-Toep <- Toeplitz(acf = acf)
-Toep
+Tz <- Toeplitz$new(acf = acf)
+Tz
 
 # allocate memory only
-Toep <- Toeplitz(n = N)
-Toep
-Toep$setAcf(acf = acf) # assign later
+Tz <- Toeplitz$new(N = N)
+Tz
+Tz$set_acf(acf = acf) # assign later
 
 ## -----------------------------------------------------------------------------
-all(acf == Toep$getAcf()) # extract acf
+all(acf == Tz$get_acf()) # extract acf
 
 # matrix multiplication
 z <- rnorm(N)
 x1 <- toeplitz(acf) %*% z # regular way
-x2 <- Toep %*% z # with Toeplitz class
+x2 <- Tz$prod(z) # with Toeplitz class
+x3 <- Tz %*% z # with Toeplitz class overloading the `%*%` operator
 range(x1-x2)
+range(x2-x3)
 
 # system of equations
 y1 <- solve(toeplitz(acf), z) # regular way
-y2 <- solve(Toep, z) # with Toeplitz class
+y2 <- Tz$solve(z) # with Toeplitz class
+y2 <- solve(Tz, z) # same thing but overloading `solve()`
 range(y1-y2)
 
 # log-determinant
 ld1 <- determinant(toeplitz(acf))$mod
-ld2 <- determinant(Toep) # note: no $mod
+ld2 <- Tz$log_det() # with Toeplitz class
+ld2 <- determinant(Tz) # same thing but overloading `determinant()`
+                         # note: no $mod
 c(ld1, ld2)
 
 ## -----------------------------------------------------------------------------
@@ -99,71 +104,80 @@ dX <- diff(Xt[,1]) # obtain the increments of a given path
 N <- length(dX)
 
 # autocorrelation of fBM increments
-fbm.acf <- function(H) {
-  msd <- fbm.msd(1:N*dT, H = H)
+fbm_acf <- function(H) {
+  msd <- fbm_msd(1:N*dT, H = H)
   msd2acf(msd)
 }
 
 # loglikelihood using generalized Schur algorithm
-Toep <- Toeplitz(n = N) # pre-allocate memory
-loglik.GS <- function(H) {
-  Toep$setAcf(acf = fbm.acf(H))
-  dSnorm(X = dX, acf = Toep, log = TRUE)
+NTz <- NormalToeplitz$new(N = N) # pre-allocate memory
+loglik_GS <- function(H) {
+  NTz$logdens(z = dX, acf = fbm_acf(H))
 }
 
 # loglikelihood using Durbin-Levinson algorithm
-loglik.DL <- function(H) {
-  dSnormDL(X = dX, acf = fbm.acf(H), log = TRUE)
+loglik_DL <- function(H) {
+  dnormtz(X = dX, acf = fbm_acf(H), method = "ltz", log = TRUE)
 }
 
 # superfast method
 system.time({
-  GS.mle <- optimize(loglik.GS, interval = c(.01, .99), maximum = TRUE)
+  GS_mle <- optimize(loglik_GS, interval = c(.01, .99), maximum = TRUE)
 })
 # fast method (about 10x slower)
 system.time({
-  DL.mle <- optimize(loglik.DL, interval = c(.01, .99), maximum = TRUE)
+  DL_mle <- optimize(loglik_DL, interval = c(.01, .99), maximum = TRUE)
 })
-c(GS = GS.mle$max, DL = DL.mle$max)
+c(GS = GS_mle$max, DL = DL_mle$max)
 
 # standard error calculation
 require(numDeriv)
-Hmle <- GS.mle$max
-Hse <- -hessian(func = loglik.GS, x = Hmle) # observed Fisher Information
+Hmle <- GS_mle$max
+Hse <- -hessian(func = loglik_GS, x = Hmle) # observed Fisher Information
 Hse <- sqrt(1/Hse[1])
 c(mle = Hmle, se = Hse)
 
 ## -----------------------------------------------------------------------------
-T1 <- Toeplitz(n = N)
+T1 <- Toeplitz$new(N = N)
 T2 <- T1 # shallow copy: both of these point to the same memory location
 
 # affects both objects
-T1$setAcf(fbm.acf(.5))
+T1$set_acf(fbm_acf(.5))
 T1
 T2
 
-loglik <- function(H) {
-  T1$setAcf(acf = fbm.acf(H))
-  dSnorm(X = dX, acf = T1, log = TRUE)
+fbm_logdet <- function(H) {
+  T1$set_acf(acf = fbm_acf(H))
+  T1$log_det()
 }
 
 # affects both objects
-loglik(H = .3)
+fbm_logdet(H = .3)
 T1
 T2
 
 ## -----------------------------------------------------------------------------
+T3 <- T1$clone(deep = TRUE)
+T1
+T3
+
+# only affect T1
+fbm_logdet(H = .7)
+T1
+T3
+
+## -----------------------------------------------------------------------------
 # autocorrelation function
-exp.acf <- function(t, lambda, sigma) sigma^2 * exp(-abs(t/lambda))
+exp_acf <- function(t, lambda, sigma) sigma^2 * exp(-abs(t/lambda))
 # gradient, returned as a 2-column matrix
-exp.acf.grad <- function(t, lambda, sigma) {
-  ea <- exp.acf(t, lambda, 1)
+exp_acf_grad <- function(t, lambda, sigma) {
+  ea <- exp_acf(t, lambda, 1)
   cbind(abs(t)*(sigma/lambda)^2 * ea, # d_acf/d_lambda
         2*sigma * ea) # d_acf/d_sigma
 }
 # Hessian, returned as an array of size length(t) x 2 x 2
-exp.acf.hess <- function(t, lambda, sigma) {
-  ea <- exp.acf(t, lambda, 1)
+exp_acf_hess <- function(t, lambda, sigma) {
+  ea <- exp_acf(t, lambda, 1)
   sl2 <- sigma/lambda^2
   hess <- array(NA, dim = c(length(t), 2, 2))
   hess[,1,1] <- sl2^2*(t^2 - 2*abs(t)*lambda) * ea # d2_acf/d_lambda^2
@@ -177,35 +191,43 @@ exp.acf.hess <- function(t, lambda, sigma) {
 lambda <- runif(1, .5, 2)
 sigma <- runif(1, .5, 2)
 tseq <- (1:N-1)*dT
-acf <- exp.acf(t = tseq, lambda = lambda, sigma = sigma)
-Xt <- rSnorm(acf = acf)
+acf <- exp_acf(t = tseq, lambda = lambda, sigma = sigma)
+Xt <- rnormtz(acf = acf)
 
-Toep <- Toeplitz(n = N) # storage space
+NTz <- NormalToeplitz$new(N = N) # storage space
 
 # negative loglikelihood function of theta = (lambda, sigma)
 # include attributes for gradient and Hessian
-exp.negloglik <- function(theta) {
+exp_negloglik <- function(theta) {
   lambda <- theta[1]
   sigma <- theta[2]
   # acf, its gradient, and Hessian
-  Toep$setAcf(acf = exp.acf(tseq, lambda, sigma)) # use the Toeplitz class
-  dacf <- exp.acf.grad(tseq, lambda, sigma)
-  d2acf <- exp.acf.hess(tseq, lambda, sigma)
-  nll <- -1 * dSnorm(X = Xt, acf = Toep, log = TRUE)
-  attr(nll, "gradient") <- -1 * Snorm.grad(X = Xt, acf = Toep, dacf = dacf)
-  attr(nll, "hessian") <- -1 * Snorm.hess(X = Xt, acf = Toep,
-                                          dacf = dacf, d2acf = d2acf)
+  acf <- exp_acf(tseq, lambda, sigma)
+  dacf <- exp_acf_grad(tseq, lambda, sigma)
+  d2acf <- exp_acf_hess(tseq, lambda, sigma)
+  # derivatives of NormalToeplitz up to order 2
+  derivs <- NTz$hess(z = Xt,
+                     dz = matrix(0, N, 2),
+                     d2z = array(0, dim = c(N, 2, 2)),
+                     acf = acf,
+                     dacf = dacf,
+                     d2acf = d2acf,
+                     full_out = TRUE)
+  # negative loglikelihood with derivatives as attributes
+  nll <- -1 * derivs$ldens
+  attr(nll, "gradient") <- -1 * derivs$grad
+  attr(nll, "hessian") <- -1 * derivs$hess
   nll
 }
 
 # optimization
 system.time({
-  mle.fit <- nlm(f = exp.negloglik, p = c(1,1), hessian = TRUE)
+  mle_fit <- nlm(f = exp_negloglik, p = c(1,1), hessian = TRUE)
 })
 
 # display estimates with standard errors
 rbind(true = c(lambda = lambda, sigma = sigma),
-      est = mle.fit$estimate,
-      se = sqrt(diag(solve(mle.fit$hessian))))
+      est = mle_fit$estimate,
+      se = sqrt(diag(solve(mle_fit$hessian))))
 
 

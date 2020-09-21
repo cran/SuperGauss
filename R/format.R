@@ -1,3 +1,12 @@
+check_acf <- function(acf, N) {
+  if(!is.numeric(acf) || !is.vector(acf)) {
+    stop("acf must be a numeric vector.")
+  }
+  if(length(acf) != N) {
+    stop("acf and X have incompatible dimensions.")
+  }
+}
+
 # extract number of parameters from these values
 # returns an error if this is not possible or
 # there are conflicting number of parameters
@@ -95,16 +104,18 @@
 
 # acf should be Toeplitz object of size N
 .format.acf <- function(acf, N) {
-  if(class(acf) == "Toeplitz") {
+  if(is.Toeplitz(acf)) {
     # is Toeplitz
-    if(acf$size != N) {
+    if(acf$size() != N) {
       stop("acf and X have incompatible dimensions.")
     }
   } else if(is.vector(acf)) {
     if(length(acf) != N) {
       stop("acf and X have incompatible dimensions.")
     } else {
-      acf <- Toeplitz(acf = acf)
+      acf2 <- acf
+      acf <- Toeplitz$new(N)
+      acf$set_acf(acf2)
     }
   } else {
     stop("acf should be either a vector or a Toeplitz object.")
