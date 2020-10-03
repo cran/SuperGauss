@@ -1,4 +1,4 @@
-35cd4aac01e9a9a4b28e7d02398757c0 *DESCRIPTION
+b077ef5b2d548231975ecefb330db137 *DESCRIPTION
 84635091e21e1b0272b6d4918d51039b *NAMESPACE
 aa703fabc643189c7a5e0fbbb2a175db *NEWS.md
 e9a19b16cae7ab4f9d5f52116d49d122 *R/Cholesky.R
@@ -26,7 +26,7 @@ b8eda842d8af20fb99fd65e8112fe97e *configure
 d41d8cd98f00b204e9800998ecf8427e *configure.win
 16e61056afa5e178d6c281ea6f30cb7d *inst/doc/SuperGauss-quicktut.R
 4e08dd736323bb703c9e97afaa55e34b *inst/doc/SuperGauss-quicktut.Rmd
-b89f8d77453ae29406f1f8c12fd796ce *inst/doc/SuperGauss-quicktut.html
+3d4591ba9876a7fd8e5a3a3d4319cb2d *inst/doc/SuperGauss-quicktut.html
 baf9cb836fd7aec17f3d0a20c3962ea3 *inst/include/SuperGauss/Circulant.h
 72e09ec5998199b9de32c4a52efddefd *inst/include/SuperGauss/DurbinLevinson.h
 9565d7cea6f1ed102ab24a1058ecac2c *inst/include/SuperGauss/EvenFFT.h
@@ -64,12 +64,12 @@ e0392c03b496eb9f04dc05743bd25e91 *src/RcppExports.cpp
 5ce36aa8d22b8ee4f5523a44bafb2c2a *src/ToeplitzExports.cpp
 dc638cdabfded9a5f96701c04d19c679 *tests/testthat.R
 aeec7a15b8da36b8bf01d90c415eb274 *tests/testthat/SuperGauss-testfunctions.R
-eafa45f39fa14c148fc7ee5fa8e54786 *tests/testthat/test-Circulant-basics.R
-5c2547450d25d36cd4611c25eb8406d9 *tests/testthat/test-Circulant-determinant.R
-147725e147830c8110fb332d8ec70f1f *tests/testthat/test-Circulant-product.R
-9721b06d5678478e5d0e61d01af6276e *tests/testthat/test-Circulant-solve.R
-9a97e145871a89d54c5318030eb0ac22 *tests/testthat/test-NormalCirculant-grad_full.R
-896fbd6340217cf14ec14d145ffaee63 *tests/testthat/test-NormalCirculant-logdens.R
+a79cf18d99e8a9bd71924bec5f974035 *tests/testthat/test-Circulant-basics.R
+2e352f71cd4d59187803b4cb5d08cd29 *tests/testthat/test-Circulant-determinant.R
+d2895c033c62172c24ad9904a7749323 *tests/testthat/test-Circulant-product.R
+b803d9e9b8e063a40b3b5fee9a3a0f34 *tests/testthat/test-Circulant-solve.R
+0a6a2a483692089fe57df5bc0f0f729b *tests/testthat/test-NormalCirculant-grad_full.R
+09ec4f1d9a292640fe1fd49027222ec0 *tests/testthat/test-NormalCirculant-logdens.R
 e16139cc056ab043caa6de4394e1148e *tests/testthat/test-NormalToeplitz-grad.R
 91351e80d3850f0b1e3c475b16a898e9 *tests/testthat/test-NormalToeplitz-grad_full.R
 16c6875e39531a426c59739852468332 *tests/testthat/test-NormalToeplitz-hess.R
@@ -83,7 +83,7 @@ f9ef6800455515e7667390d8358d6005 *tests/testthat/test-Toeplitz-crossprod.R
 8eb5b55befc9c5f815af369a8ae45b6f *tests/testthat/test-Toeplitz-solve.R
 5587b37744b3b7f736193ed0f6b12a01 *tests/testthat/test-Toeplitz-trace_grad.R
 b47616301015c2703ebd92e6cb88afb3 *tests/testthat/test-Toeplitz-trace_hess.R
-30a2a38327aa11664a73c8c16d67b56e *tests/testthat/test-fft.R
+79f37f316b0019050ae6cdedafc4c3d9 *tests/testthat/test-fft.R
 4e08dd736323bb703c9e97afaa55e34b *vignettes/SuperGauss-quicktut.Rmd
 f4ab679c03c577575a5ff9d1dc1fe53a *vignettes/references.bib
 7a42e12d13883831c20d5eddd9f2a983 *vignettes/taylor-and-francis-harvard-x.csl
