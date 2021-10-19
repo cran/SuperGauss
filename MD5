@@ -1,4 +1,4 @@
-b077ef5b2d548231975ecefb330db137 *DESCRIPTION
+eb77862e4222b7680007dc5798a79dd5 *DESCRIPTION
 84635091e21e1b0272b6d4918d51039b *NAMESPACE
 aa703fabc643189c7a5e0fbbb2a175db *NEWS.md
 e9a19b16cae7ab4f9d5f52116d49d122 *R/Cholesky.R
@@ -19,14 +19,14 @@ e180b2e98de98ce7c0cdc0a4246bc717 *R/dnormtz.R
 987dc9dda12a19d1e4a0c4fe4a4b72db *R/msd2acf.R
 e39d06eb1fb6a8406b9bb2e32b1d2fbf *R/pex_acf.R
 8d518e3ec7767c2738faa47cf3f1bc3f *R/rnormtz.R
-e531db9092522c4ebd169999c8c5de02 *build/vignette.rds
+a0b558e85ee9e4c100ea663dc98cc217 *build/vignette.rds
 825f13b60d003aa6580ee5df4c8acb9d *cleanup
-b8eda842d8af20fb99fd65e8112fe97e *configure
-30c559cc948ce168d9e56d9a665f94f6 *configure.ac
+49f788a1b62b04dc0859d7538ff83243 *configure
+163b13c3758918699de6b2b5b020636a *configure.ac
 d41d8cd98f00b204e9800998ecf8427e *configure.win
 16e61056afa5e178d6c281ea6f30cb7d *inst/doc/SuperGauss-quicktut.R
 4e08dd736323bb703c9e97afaa55e34b *inst/doc/SuperGauss-quicktut.Rmd
-3d4591ba9876a7fd8e5a3a3d4319cb2d *inst/doc/SuperGauss-quicktut.html
+1b374bedf004a186e14dfba6511356b5 *inst/doc/SuperGauss-quicktut.html
 baf9cb836fd7aec17f3d0a20c3962ea3 *inst/include/SuperGauss/Circulant.h
 72e09ec5998199b9de32c4a52efddefd *inst/include/SuperGauss/DurbinLevinson.h
 9565d7cea6f1ed102ab24a1058ecac2c *inst/include/SuperGauss/EvenFFT.h
@@ -41,8 +41,8 @@ db59bdd7f952a3c37300fcb70ded49ec *man/Cholesky.Rd
 62aecb87a9c2af6d114696517d0083b7 *man/NormalCirculant.Rd
 0bf27e9fb44d392df9fedc14029b9bb8 *man/NormalToeplitz.Rd
 e45c3495f4de5ad4d8f874e791050fe2 *man/SuperGauss-defunct.Rd
-85415272b99fc0beeab66b775f77ac94 *man/SuperGauss-package.Rd
-30b1cd379f8cf85f8c7f4d4de90ec316 *man/Toeplitz.Rd
+9daf11d7a876b6f4beb998785d930078 *man/SuperGauss-package.Rd
+c0d55a21ef134271bd5f8e98041ee79b *man/Toeplitz.Rd
 b5a3467f5efc407b0c117471775dabe1 *man/acf2incr.Rd
 ce64fe56daf9c8f27e845736ee7c2d1b *man/acf2msd.Rd
 a95734dcdbf08bb63688f73cf8a1875c *man/dnormtz.Rd
