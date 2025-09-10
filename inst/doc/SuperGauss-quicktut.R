@@ -52,7 +52,7 @@ system.time({
   matrix(rnorm(N*npaths), npaths, N) %*% chol(toeplitz(acf))
 })
 
-## ---- fig.width = 10, fig.height = 5, out.width = "90%"-----------------------
+## ----fig.width = 10, fig.height = 5, out.width = "90%"------------------------
 # convert increments to position measurements
 Xt <- apply(rbind(0, dX), 2, cumsum)
 
